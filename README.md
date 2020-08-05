@@ -1,2 +1,9 @@
 # metalock
-a metaclass that makes building parallel systems easier by providing each slot within a class a lock which is grabbed automatically
+### _Your Name <your.name@example.com>_
+
+This is a project to do ... something.
+
+## License
+
+Specify license here
+
