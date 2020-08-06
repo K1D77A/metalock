@@ -1,4 +1,5 @@
 ;;;; package.lisp
 
 (defpackage #:metalock
-  (:use #:cl))
+  (:use #:cl)
+  (:export #:metalock))

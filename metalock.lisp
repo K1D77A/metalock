@@ -50,9 +50,9 @@
       (let* ((name (c2mop:slot-definition-name slotd))
              (lock (cdr (assoc name (slot-value object 'slot-locks)))))
         (bt:with-lock-held (lock)
-          (print "reading. lock held")
+          (print "boundp. lock held")
           (let ((val (call-next-method)))
-            (print "reading. lock dropped")
+            (print "boundp. lock dropped")
             val)))))
 
 (defmethod c2mop:slot-makunbound-using-class :around ((class metalock) object slotd)
@@ -61,11 +61,10 @@
       (let* ((name (c2mop:slot-definition-name slotd))
              (lock (cdr (assoc name (slot-value object 'slot-locks)))))
         (bt:with-lock-held (lock)
-          (print "reading. lock held")
+          (print "making-unbound. lock held")
           (let ((val (call-next-method)))
-            (print "reading. lock dropped")
+            (print "making-unbound. lock dropped")
             val)))))
-
 
 (defun slot-names-to-lock-alist (slot-names)
   (check-type slot-names list)
