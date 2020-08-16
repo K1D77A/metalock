@@ -9,4 +9,5 @@
   :depends-on (#:closer-mop
                #:bordeaux-threads)
   :components ((:file "package")
+               (:file "readwriter-lock")
                (:file "metalock")))

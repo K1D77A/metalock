@@ -27,7 +27,7 @@
       (call-next-method)
       (let* ((name (c2mop:slot-definition-name slotd))
              (lock (cdr (assoc name (slot-value object 'slot-locks)))))
-        (bt:with-lock-held (lock)
+        (read-with-rw-lock (lock)
           (print "reading. lock held")
           (let ((val (call-next-method)))
             (print "reading. lock dropped")
@@ -38,7 +38,7 @@
       (call-next-method)
       (let* ((name (c2mop:slot-definition-name slotd))
              (lock (cdr (assoc name (slot-value object 'slot-locks)))))
-        (bt:with-lock-held (lock)
+        (write-with-rw-lock (lock)
           (print "setting. lock held")
           (let ((val (call-next-method)))
             (print "setting. lock dropped")
@@ -49,7 +49,7 @@
       (call-next-method)
       (let* ((name (c2mop:slot-definition-name slotd))
              (lock (cdr (assoc name (slot-value object 'slot-locks)))))
-        (bt:with-lock-held (lock)
+        (read-with-rw-lock (lock)
           (print "boundp. lock held")
           (let ((val (call-next-method)))
             (print "boundp. lock dropped")
@@ -60,7 +60,7 @@
       (call-next-method)
       (let* ((name (c2mop:slot-definition-name slotd))
              (lock (cdr (assoc name (slot-value object 'slot-locks)))))
-        (bt:with-lock-held (lock)
+        (write-with-rw-lock (lock)
           (print "making-unbound. lock held")
           (let ((val (call-next-method)))
             (print "making-unbound. lock dropped")
@@ -69,44 +69,26 @@
 (defun slot-names-to-lock-alist (slot-names)
   (check-type slot-names list)
   (mapcar (lambda (name)
-            (cons name (bt:make-lock)))
+            (cons name (make-instance 'reader-writer-lock)))
           slot-names))
 
 (defmethod c2mop:compute-slots ((class metalock))
   (let* ((normal-slots (call-next-method))
          (slot-names (mapcar #'c2mop:slot-definition-name normal-slots))
-         (instance-lock (list (list :held nil) (list :lock (bt:make-lock))))
          (slot-names-lock-alist (slot-names-to-lock-alist slot-names)))
-    (append 
-     (list (make-instance 'special-slot 
-                          :name 'slot-locks
-                          :initform `',slot-names-lock-alist
-                          :initfunction #'(lambda () slot-names-lock-alist))
-           (make-instance 'special-slot 
-                          :name 'instance-lock
-                          :initform `',instance-lock
-                          :initfunction #'(lambda () instance-lock)))
+    (cons 
+     (make-instance 'special-slot 
+                    :name 'slot-locks
+                    :initform `',slot-names-lock-alist
+                    :initfunction #'(lambda () slot-names-lock-alist))
      normal-slots)))
 
-(defmethod globally-locked-p ((instance metalock))
-  (second (assoc :held (slot-value instance 'instance-lock))))
 
-(defmethod set-global-lock ((instance metalock))
-  "Given an INSTANCE of a metalock class, sets the instance to globally locked. This should only 
-be used when grabbing the instance lock."
-  
-
-  (defmacro synchronise ((metalocked-object) &body)
-    "Given an instance of a class thats metaclass is a 'metalock'. This macro will guarantee that 
-execution of body happens in a way that only one thread can modify the object at one time"
-    
-    )
-  
-
-  (defclass locked-object ()
-    ((arr :initform "oof"
-          :accessor arr-access)
-     (name
-      :accessor name))
-    (:metaclass metalock))
+(defclass locked-object ()
+  ((arr :initform "oof"
+        :accessor arr-access)
+   (name
+    :initform "juice"
+    :accessor name))
+  (:metaclass metalock))
 
