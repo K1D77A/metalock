@@ -29,76 +29,119 @@
     :type boolean
     :initform nil)))
 
-(defun begin-read (reader-writer-lock)
-  (with-accessors ((g g-lock)
-                   (ww writers-waiting)
-                   (c-var condition-var)
-                   (ra readers-active))
-      reader-writer-lock
-    (bt:with-lock-held (g)
-      (while-loop (> ww 0)
-        (bt:condition-wait c-var g))
-      (incf ra))))
+;; (defun begin-read (reader-writer-lock)
+;;   (with-accessors ((g g-lock)
+;;                    (ww writers-waiting)
+;;                    (c-var condition-var)
+;;                    (ra readers-active))
+;;       reader-writer-lock
+;;     (bt:with-lock-held (g)
+;;       (while-loop (> ww 0)
+;;         (bt:condition-wait c-var g))
+;;       (incf ra))))
 
-(defun end-read (reader-writer-lock)
-  (with-accessors ((g g-lock)
-                   (c-var condition-var)
-                   (ra readers-active))
-      reader-writer-lock
-    (bt:with-lock-held (g)
-      (unless (zerop ra)
-        (decf ra))
-      (when (zerop ra)
-        (bt:condition-notify c-var)))))
+;; (defun end-read (reader-writer-lock)
+;;   (with-accessors ((g g-lock)
+;;                    (c-var condition-var)
+;;                    (ra readers-active))
+;;       reader-writer-lock
+;;     (bt:with-lock-held (g)
+;;       (unless (zerop ra)
+;;         (decf ra))
+;;       (when (zerop ra)
+;;         (bt:condition-notify c-var)))))
 
-(defun begin-write (reader-writer-lock)
-  (with-accessors ((g g-lock)
-                   (ra readers-active)
-                   (ww writers-waiting)
-                   (c-var condition-var)
-                   (aw active-writer-p))
-      reader-writer-lock
-    (bt:with-lock-held (g)
-      (incf ww)
-      (while-loop (or (> ra 0) aw)
-        (bt:condition-notify c-var))
-      (decf ww)
-      (setf aw t))))
+;; (defun begin-write (reader-writer-lock)
+;;   (with-accessors ((g g-lock)
+;;                    (ra readers-active)
+;;                    (ww writers-waiting)
+;;                    (c-var condition-var)
+;;                    (aw active-writer-p))
+;;       reader-writer-lock
+;;     (bt:with-lock-held (g)
+;;       (incf ww)
+;;       (while-loop (or (> ra 0) aw)
+;;         (bt:condition-notify c-var))
+;;       (decf ww)
+;;       (setf aw t))))
 
-(defun end-write (reader-writer-lock)
-  (with-accessors ((g g-lock)
-                   (c-var condition-var)
-                   (aw active-writer-p))
-      reader-writer-lock
-    (bt:with-lock-held (g)
-      (setf aw nil)
-      (bt:condition-notify c-var))))
+;; (defun end-write (reader-writer-lock)
+;;   (with-accessors ((g g-lock)
+;;                    (c-var condition-var)
+;;                    (aw active-writer-p))
+;;       reader-writer-lock
+;;     (bt:with-lock-held (g)
+;;       (setf aw nil)
+;;       (bt:condition-notify c-var))))
 
-(defmacro read-with-rw-lock ((lock) &body body)
-  (let ((locked (gensym)))
-    `(let ((,locked nil))
-       (unwind-protect
-            (progn
-              (begin-read ,lock)
-              (setf ,locked t)
-              (prog1
-                  (locally ,@body)
-                (end-write ,lock)
-                (setf ,locked nil)))
-         (when ,locked
-           (end-read ,lock))))))
+;; (defmacro read-with-rw-lock ((lock) &body body)
+;;   (let ((locked (gensym)))
+;;     `(let ((,locked nil))
+;;        (unwind-protect
+;;             (progn
+;;               (begin-read ,lock)
+;;               (setf ,locked t)
+;;               (prog1
+;;                   (locally ,@body)
+;;                 (end-write ,lock)
+;;                 (setf ,locked nil)))
+;;          (when ,locked
+;;            (end-read ,lock))))))
 
-(defmacro write-with-rw-lock ((lock) &body body)
-  (let ((locked (gensym)))
-    `(let ((,locked nil))
-       (unwind-protect
-            (progn
-              (begin-write ,lock)
-              (setf ,locked t)
-              (prog1
-                  (locally ,@body)
-                (end-write ,lock)
-                (setf ,locked nil)))
-         (when ,locked
-           (end-write ,lock))))))
+;; (defmacro write-with-rw-lock ((lock) &body body)
+;;   (let ((locked (gensym)))
+;;     `(let ((,locked nil))
+;;        (unwind-protect
+;;             (progn
+;;               (begin-write ,lock)
+;;               (setf ,locked t)
+;;               (prog1
+;;                   (locally ,@body)
+;;                 (end-write ,lock)
+;;                 (setf ,locked nil)))
+;;          (when ,locked
+;;            (end-write ,lock))))))
 
+(defmacro write-with-rw-lock ((reader-writer-lock) &body body)
+  (let ((retval (gensym))
+        (lock (gensym)))
+    `(let ((,retval nil)
+           (,lock ,reader-writer-lock))
+       (with-accessors ((g g-lock)
+                        (ra readers-active)
+                        (ww writers-waiting)
+                        (c-var condition-var))
+           ,lock
+         (bt:with-lock-held (g)
+           (unwind-protect
+                (incf ww)
+             (unwind-protect
+                  (progn
+                    (while-loop (> ra 0)
+                      (bt:condition-wait c-var g))
+                    (setf ,retval (locally ,@body)))
+               (decf ww)
+               (bt:condition-notify c-var)))))
+       ,retval)))
+
+(defmacro read-with-rw-lock ((reader-writer-lock) &body body)
+  (let ((retval (gensym))
+        (lock (gensym)))
+    `(let ((,retval ,nil)
+           (,lock ,reader-writer-lock))
+       (with-accessors ((g g-lock)
+                        (ww writers-waiting)
+                        (c-var condition-var)
+                        (ra readers-active))
+           ,lock
+         (bt:with-lock-held (g)
+           (unwind-protect 
+                (while-loop (> ww 0)
+                  (bt:condition-wait c-var g))
+             (unwind-protect
+                  (progn (incf ra)
+                         (setf ,retval (locally ,@body)))
+               (decf ra)
+               (when (zerop ra)
+                 (bt:condition-notify c-var))))))
+       ,retval)))
