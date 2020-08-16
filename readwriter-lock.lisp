@@ -75,16 +75,30 @@
       (bt:condition-notify c-var))))
 
 (defmacro read-with-rw-lock ((lock) &body body)
-  `(unwind-protect
-        (prog2 (begin-read ,lock)
-            (progn ,@body)
-          (end-read ,lock))
-     (end-read ,lock)))
+  (let ((locked (gensym)))
+    `(let ((,locked nil))
+       (unwind-protect
+            (progn
+              (begin-read ,lock)
+              (setf ,locked t)
+              (prog1
+                  (locally ,@body)
+                (end-write ,lock)
+                (setf ,locked nil)))
+         (when ,locked
+           (end-read ,lock))))))
 
 (defmacro write-with-rw-lock ((lock) &body body)
-  `(unwind-protect
-        (prog2 (begin-write ,lock)
-            (progn ,@body)
-          (end-write ,lock))
-     (end-read ,lock)))
+  (let ((locked (gensym)))
+    `(let ((,locked nil))
+       (unwind-protect
+            (progn
+              (begin-write ,lock)
+              (setf ,locked t)
+              (prog1
+                  (locally ,@body)
+                (end-write ,lock)
+                (setf ,locked nil)))
+         (when ,locked
+           (end-write ,lock))))))
 
