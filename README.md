@@ -12,3 +12,4 @@ https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock#Using_a_condition_vari
 
 MIT
 
+* needs to work for initialized instances when you redefine the class.
