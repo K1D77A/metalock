@@ -8,8 +8,12 @@ distribution of CL must use these methods to implement access functions like 'sl
 Access to slots is controlled using read-writer locks described here: 
 https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock#Using_a_condition_variable_and_a_mutex
 
-
-![Example of it in action:](https://i.imgur.com/7NybNvC.png)
+```lisp
+(defclass myclass ()
+  ((oneslot :accessor oneslot :initform 1))
+ (:metaclass metalock:metalock))
+ ```
+Instantiate and use like normal. 
 
 ## License
 
