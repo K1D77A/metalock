@@ -71,12 +71,3 @@
                     :initfunction #'(lambda () slot-names-lock-alist))
      normal-slots)))
 
-
-(defclass locked-object ()
-  ((arr :initform "oof"
-        :accessor arr-access)
-   (name
-    :initform "juice"
-    :accessor name))
-  (:metaclass metalock))
-
